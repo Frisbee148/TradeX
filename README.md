@@ -89,6 +89,28 @@ The baseline policy follows simple surveillance rules:
 
 Implementation lives in [meverse/baseline_policy.py](/d:/TradeX/meverse/baseline_policy.py).
 
+## Why The Baseline Beats Edge Cases
+
+This benchmark is designed so fixed one-action policies perform poorly even if they look safe in one dimension.
+
+- An always-`ALLOW` policy preserves healthy traffic, but misses suspicious behavior and creates many false negatives.
+- An always-`BLOCK` policy catches suspicious behavior, but harms normal users and creates many false positives and overblocking penalties.
+- An always-`FLAG` policy is less severe than blocking, but still reacts too aggressively to normal activity.
+- An always-`MONITOR` policy is gentler, but still leaves severe suspicious behavior under-addressed.
+
+The baseline performs better because it adapts its response to the observed surveillance signals. It allows clearly normal activity, flags bursty elevated activity, monitors borderline cases, and blocks only the strongest manipulation patterns. That balance is exactly what the grader rewards.
+
+## Why Adaptive Policy Matters
+
+Real surveillance is not solved by one fixed action. The same response should not be used for every market condition.
+
+- Normal market flow should usually be allowed.
+- Bursty but not fully proven suspicious behavior may deserve a flag rather than a block.
+- Borderline cases often benefit from monitoring instead of immediate escalation.
+- Strong manipulation patterns should be blocked decisively.
+
+This is why the benchmark emphasizes adaptive decision-making instead of a single hard-coded extreme. The agent is rewarded for matching the intensity of its response to the severity of the observed market behavior while preserving healthy market participation.
+
 ## Running The Environment
 
 Serve the OpenEnv app from the repo root:
