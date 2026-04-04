@@ -111,6 +111,53 @@ Real surveillance is not solved by one fixed action. The same response should no
 
 This is why the benchmark emphasizes adaptive decision-making instead of a single hard-coded extreme. The agent is rewarded for matching the intensity of its response to the severity of the observed market behavior while preserving healthy market participation.
 
+## Benchmark Results
+
+The table below shows deterministic eval-mode scores for several fixed edge-case policies compared with the adaptive baseline:
+
+| Policy | burst | pattern | full |
+|---|---:|---:|---:|
+| Always `ALLOW` | 0.3707 | 0.3705 | 0.3692 |
+| Always `BLOCK` | 0.6931 | 0.6930 | 0.6924 |
+| Always `FLAG` | 0.6789 | 0.6788 | 0.6778 |
+| Always `MONITOR` | 0.7631 | 0.7629 | 0.7617 |
+| Baseline (adaptive) | 0.9057 | 0.9764 | 0.9788 |
+
+These results make the benchmark design visible at a glance:
+
+- the fixed edge-case policies each do well on one dimension but fail badly on others
+- the adaptive baseline is consistently stronger because it balances detection with false-positive control and healthy market preservation
+- the biggest gap appears on the harder pattern and full-surveillance tasks, where a one-action strategy is especially brittle
+
+## Real-World Relevance
+
+This environment is intentionally framed as a market surveillance and anomaly-detection benchmark, but the decision problem maps closely to real operational systems.
+
+It simulates challenges faced by:
+
+- centralized exchange risk and abuse monitoring teams
+- on-chain MEV and transaction-monitoring systems
+- fraud and anomaly-detection pipelines in digital marketplaces
+- market integrity and surveillance groups at trading venues
+- regulatory and compliance teams that need explainable escalation decisions
+
+The core real-world tension is the same across those settings:
+
+- react too slowly, and harmful behavior is allowed to continue
+- react too aggressively, and normal users are harmed by false positives
+- apply the same action everywhere, and the system becomes brittle
+
+That is why this benchmark does not reward a single extreme strategy. It rewards systems that can interpret changing signals, calibrate the severity of their response, and preserve healthy market behavior while still catching adversarial activity.
+
+In practical terms, the benchmark reflects real decision-making tradeoffs around:
+
+- security versus user experience
+- sensitivity versus precision
+- fast escalation versus overblocking
+- explainable rules versus adaptive behavior
+
+The goal is not just to detect suspicious activity in the abstract. The goal is to benchmark decision-making systems that must make context-sensitive interventions under uncertainty, which is exactly the kind of problem faced by modern surveillance, trust, and market safety systems.
+
 ## Running The Environment
 
 Serve the OpenEnv app from the repo root:
