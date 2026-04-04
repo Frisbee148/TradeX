@@ -65,7 +65,7 @@ def llm_action(client: OpenAI, observation) -> str:
     response = client.chat.completions.create(
         model=MODEL_NAME,
         temperature=0.0,
-        max_tokens=8,
+        max_tokens=12,
         messages=[
             {
                 "role": "system",
@@ -75,12 +75,13 @@ def llm_action(client: OpenAI, observation) -> str:
                     "but NEVER penalize normal healthy trading.\n"
                     "Actions: ALLOW, FLAG, BLOCK, MONITOR.\n"
                     "Rules (apply in order, stop at first match):\n"
-                    "1. burst_indicator >= 0.70 OR manipulation_score >= 0.70 → BLOCK\n"
-                    "2. suspiciousness_score >= 0.65 AND pattern_indicator >= 0.40 → BLOCK\n"
-                    "3. burst_indicator >= 0.50 AND suspiciousness_score >= 0.60 → FLAG\n"
-                    "4. suspiciousness_score >= 0.55 → MONITOR\n"
-                    "5. Otherwise → ALLOW (this is the safe default for healthy markets)\n"
-                    "IMPORTANT: If suspiciousness_score < 0.55 AND manipulation_score < 0.55, ALWAYS choose ALLOW.\n"
+                    "1. manipulation_score >= 0.55 → BLOCK\n"
+                    "2. trade_frequency >= 7.0 AND time_gap_min < 0.5 → BLOCK\n"
+                    "3. burst_indicator >= 0.50 AND suspiciousness_score >= 0.45 → BLOCK\n"
+                    "4. suspiciousness_score >= 0.50 AND pattern_indicator >= 0.35 → FLAG\n"
+                    "5. trade_frequency >= 5.0 AND average_trade_size > 18 → FLAG\n"
+                    "6. burst_indicator >= 0.35 OR suspiciousness_score >= 0.40 → MONITOR\n"
+                    "7. Otherwise → ALLOW\n"
                     "Return JSON only: {\"action\": \"ALLOW\"}"
                 ),
             },

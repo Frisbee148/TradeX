@@ -102,18 +102,38 @@ def generate_step_from_state(
                 dx = -dx
             apply_trade(state, dx)
 
+        # Stealth factor: bots that have been blocked learn to hide
+        # More steps survived = smarter bots with lower visible signals
+        stealth = min(0.6, state.step * 0.012)
+        is_stealthy = rng.random() < (0.25 + stealth)
+
         intensity = 0.4 + 0.6 * state.bot_confidence
-        burst = min(1.0, rng.uniform(0.55, 0.95) * intensity * (0.5 + burst_bias))
-        pattern = min(1.0, rng.uniform(0.50, 0.95) * intensity * (0.5 + pattern_bias))
-        suspicious = min(1.0, 0.3 + 0.7 * state.bot_confidence + rng.uniform(-0.05, 0.05))
-        manipulation = min(1.0, pattern * rng.uniform(0.85, 1.0))
-        severity = min(1.0, 0.3 + 0.7 * state.bot_confidence * rng.uniform(0.8, 1.0))
+        if is_stealthy:
+            # Stealthy bot: deliberately suppressed indicators
+            burst = min(1.0, rng.uniform(0.18, 0.48) * (0.5 + burst_bias))
+            pattern = min(1.0, rng.uniform(0.15, 0.45) * (0.5 + pattern_bias))
+            suspicious = min(1.0, rng.uniform(0.20, 0.50) + state.bot_confidence * 0.15)
+            manipulation = min(1.0, rng.uniform(0.10, 0.40))
+            severity = min(1.0, 0.35 + 0.4 * state.bot_confidence * rng.uniform(0.6, 1.0))
+        else:
+            # Overt bot: clear signals
+            burst = min(1.0, rng.uniform(0.55, 0.95) * intensity * (0.5 + burst_bias))
+            pattern = min(1.0, rng.uniform(0.50, 0.95) * intensity * (0.5 + pattern_bias))
+            suspicious = min(1.0, 0.3 + 0.7 * state.bot_confidence + rng.uniform(-0.05, 0.05))
+            manipulation = min(1.0, pattern * rng.uniform(0.85, 1.0))
+            severity = min(1.0, 0.3 + 0.7 * state.bot_confidence * rng.uniform(0.8, 1.0))
+
         health = max(0.0, min(1.0, state.health_index - 0.2 * state.bot_confidence))
         label = "suspicious"
 
-        trades = [round(rng.uniform(15, 32) * (1.0 + 0.5 * state.bot_confidence), 4) for _ in range(5)]
-        gaps = [round(max(0.1, rng.uniform(0.2, 1.5) / (1.0 + state.bot_confidence)), 4) for _ in range(5)]
-        impacts = [round(min(0.1, rng.uniform(0.015, 0.05) * (1.0 + state.bot_confidence)), 4) for _ in range(5)]
+        if is_stealthy:
+            trades = [round(rng.uniform(10, 22) * (1.0 + 0.2 * state.bot_confidence), 4) for _ in range(5)]
+            gaps = [round(max(0.3, rng.uniform(1.0, 4.0)), 4) for _ in range(5)]
+            impacts = [round(min(0.1, rng.uniform(0.008, 0.025)), 4) for _ in range(5)]
+        else:
+            trades = [round(rng.uniform(15, 32) * (1.0 + 0.5 * state.bot_confidence), 4) for _ in range(5)]
+            gaps = [round(max(0.1, rng.uniform(0.2, 1.5) / (1.0 + state.bot_confidence)), 4) for _ in range(5)]
+            impacts = [round(min(0.1, rng.uniform(0.015, 0.05) * (1.0 + state.bot_confidence)), 4) for _ in range(5)]
     else:
         # Normal organic trading
         num_trades = rng.randint(1, 3)
@@ -123,10 +143,19 @@ def generate_step_from_state(
                 dx = -dx
             apply_trade(state, dx)
 
-        burst = min(1.0, max(0.0, rng.uniform(0.02, 0.30) + state.volatility * 0.3))
-        pattern = min(1.0, max(0.0, rng.uniform(0.02, 0.25)))
-        suspicious = min(1.0, max(0.0, rng.uniform(0.05, 0.35) + state.volatility * 0.2))
-        manipulation = min(1.0, max(0.0, rng.uniform(0.02, 0.20)))
+        # Noisy normal: real markets have spikes that look suspicious
+        noise_spike = rng.random() < 0.15
+        if noise_spike:
+            burst = min(1.0, max(0.0, rng.uniform(0.25, 0.55) + state.volatility * 0.4))
+            pattern = min(1.0, max(0.0, rng.uniform(0.15, 0.40)))
+            suspicious = min(1.0, max(0.0, rng.uniform(0.25, 0.50) + state.volatility * 0.3))
+            manipulation = min(1.0, max(0.0, rng.uniform(0.10, 0.30)))
+        else:
+            burst = min(1.0, max(0.0, rng.uniform(0.02, 0.30) + state.volatility * 0.3))
+            pattern = min(1.0, max(0.0, rng.uniform(0.02, 0.25)))
+            suspicious = min(1.0, max(0.0, rng.uniform(0.05, 0.35) + state.volatility * 0.2))
+            manipulation = min(1.0, max(0.0, rng.uniform(0.02, 0.20)))
+
         severity = rng.uniform(0.02, 0.18)
         health = min(1.0, state.health_index + rng.uniform(-0.02, 0.02))
         label = "normal"
@@ -156,6 +185,8 @@ def generate_step_from_state(
 
 def _generate_note(label: str, burst: float, pattern: float, bot_conf: float) -> str:
     if label == "normal":
+        if burst > 0.35:
+            return "Noisy but organic spike — false positive risk."
         if burst > 0.20:
             return "Slightly elevated but organic activity."
         return "Routine market flow."
@@ -163,6 +194,8 @@ def _generate_note(label: str, burst: float, pattern: float, bot_conf: float) ->
         return f"Aggressive burst attack (bot confidence {bot_conf:.0%})."
     if pattern > 0.75:
         return f"Coordinated pattern manipulation (bot confidence {bot_conf:.0%})."
+    if burst < 0.35 and pattern < 0.35:
+        return f"Stealthy bot activity — low signal footprint (bot confidence {bot_conf:.0%})."
     return f"Suspicious activity detected (bot confidence {bot_conf:.0%})."
 
 
