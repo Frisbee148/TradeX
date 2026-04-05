@@ -431,12 +431,12 @@ def _make_amm_chart(state: EpisodeState) -> go.Figure:
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="#1a1d27",
         font=dict(color="#e4e6eb", family="Inter, system-ui, sans-serif"),
-        margin=dict(l=65, r=65, t=50, b=50),
+        margin=dict(l=65, r=65, t=88, b=50),
         legend=dict(
-            orientation="h", y=1.10, x=0.5, xanchor="center",
+            orientation="h", y=1.18, x=0.5, xanchor="center",
             bgcolor="rgba(26,29,39,0.9)",
             bordercolor="#2a2d3a", borderwidth=1,
-            font=dict(size=11, color="#e4e6eb"),
+            font=dict(size=10, color="#e4e6eb"),
         ),
         height=540,
     )
