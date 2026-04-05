@@ -148,6 +148,40 @@ class MarketSurveillanceEnvironment(Environment[SurveillanceAction, Surveillance
             "baseline_last_action": choose_surveillance_action(self._build_observation(0.0, self._done)),
         }
 
+    def debug_snapshot(self) -> Dict[str, Any]:
+        current_step = None
+        if not self._done:
+            step_data = self._current_step_data
+            current_step = {
+                "label": step_data.label,
+                "severity": step_data.severity,
+                "healthy_market_index": step_data.healthy_market_index,
+                "burst_indicator": step_data.burst_indicator,
+                "pattern_indicator": step_data.pattern_indicator,
+                "suspiciousness_score": step_data.suspiciousness_score,
+                "manipulation_score": step_data.manipulation_score,
+                "scenario_note": step_data.note,
+            }
+
+        return {
+            "episode_id": self._state.episode_id,
+            "task_name": self._task_name,
+            "step_num": self._step_num,
+            "max_steps": self._task.num_steps,
+            "done": self._done,
+            "last_reward": self._last_reward,
+            "last_action_error": self._last_action_error,
+            "amm_state": {
+                "price": round(self._amm.price, 4),
+                "liquidity": round(self._amm.liquidity, 4),
+                "bot_confidence": round(self._amm.bot_confidence, 4),
+                "volatility": round(self._amm.volatility, 4),
+                "health_index": round(self._amm.health_index, 4),
+                "step": self._amm.step,
+            },
+            "current_step": current_step,
+        }
+
     def _reward_for_action(self, action_type: str, step_data) -> float:
         severity = step_data.severity
         health = step_data.healthy_market_index

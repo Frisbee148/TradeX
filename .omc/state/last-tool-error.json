@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"pkill -f \\\"python app.py\\\" 2>/dev/null; echo \\\"done\\\"\",\"description\":\"Kill background server\"}",
-  "error": "Exit code 144",
-  "timestamp": "2026-04-04T03:13:17.203Z",
+  "tool_input_preview": "{\"command\":\"timeout 20 python -c \\\"\\nfrom dashboard import build_app, run_full_episode, compare_policies\\n\\n# Test app build\\napp = build_app()\\nprint('1. App built OK')\\n\\n# Test episode runner\\nresu...",
+  "error": "Exit code 1\nTraceback (most recent call last):\n  File \"<string>\", line 9, in <module>\n    results = run_full_episode('burst_detection', 'Heuristic', 42)\n  File \"/home/casp1an/Code/TradeX1/dashboard.py\", line 179, in run_full_episode\n    _make_signal_heatmap(state),\n    ~~~~~~~~~~~~~~~~~~~~^^^^^^^\n  File \"/home/casp1an/Code/TradeX1/dashboard.py\", line 280, in _make_signal_heatmap\n    fig = go.Figure(go.Heatmap(\n                    ~~~~~~~~~~^\n        z=matrix,\n        ^^^^^^^^^\n    ...<10 lines>....",
+  "timestamp": "2026-04-05T00:22:16.120Z",
   "retry_count": 1
 }
