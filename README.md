@@ -1,12 +1,3 @@
----
-title: TradeX Surveillance Dashboard
-emoji: "📊"
-colorFrom: blue
-colorTo: green
-sdk: docker
-pinned: false
----
-
 # TradeX: Bot-Aware Market Surveillance in Simulated AMM Trading
 
 TradeX is a reinforcement-learning benchmark environment built on the [OpenEnv](https://github.com/openenv) framework. It simulates a constant-product Automated Market Maker (AMM) pool and asks an AI agent to act as a **market surveillance controller** — detecting suspicious bot-driven trading activity in real time while preserving healthy market participation.
@@ -171,7 +162,7 @@ A score of `>= 0.6` is considered a passing episode.
 
 ## Tasks
 
-The benchmark includes three deterministic tasks with escalating difficulty:
+The benchmark includes three deterministic tasks with escalating difficulty. **All three tasks are evaluated independently during hackathon submission** — the OpenEnv harness reads `openenv.yaml`, discovers each task, and runs `inference.py` once per task by setting `MEVERSE_TASK`. You do not need to switch manually for submission; the harness handles it. For local testing, you can select a specific task with `MEVERSE_TASK="burst_detection" python inference.py`.
 
 ### `burst_detection` (Easy — 50 steps)
 
@@ -183,7 +174,7 @@ The agent faces sustained, rhythmic coordination — trades that aren't necessar
 
 ### `full_market_surveillance` (Hard — 60 steps)
 
-Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst-type and pattern-type attacks. Initial bot confidence: **0.30**. This is the default task for inference runs.
+Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst-type and pattern-type attacks. Initial bot confidence: **0.30**. **This is the default task when you run `python inference.py` without setting `MEVERSE_TASK`**, which is why you see exactly 60 `[STEP]` logs in a default run.
 
 ---
 
