@@ -21,7 +21,7 @@ This is **not** a trading bot, DeFi product, wallet, liquidity manager, or block
 - [How It Works](#how-it-works)
 - [Observation Space](#observation-space)
 - [Action Space](#action-space)
-- [Reward Logic and Grading](#reward-logic-and-grading)
+- [Reward Logic and Scoring](#reward-logic-and-scoring)
 - [Tasks](#tasks)
 - [Baseline Policies](#baseline-policies)
 - [Runnable Files — What to Run and When](#runnable-files-what-to-run-and-when)
@@ -29,7 +29,7 @@ This is **not** a trading bot, DeFi product, wallet, liquidity manager, or block
 - [Debug Telemetry](#debug-telemetry)
 - [Project Structure](#project-structure)
 - [Documentation](#documentation)
-- [For Judges](#for-judges)
+- [Quick Start](#quick-start)
 - [Futuristic Roadmap](#futuristic-roadmap)
 
 ---
@@ -90,7 +90,7 @@ A float (0.0–1.0) that specifically captures how much the current activity loo
 3. **The agent receives a structured observation** containing 16 surveillance signals (price, liquidity, trade stats, time gaps, burst/pattern/suspicion/manipulation indicators).
 4. **The agent chooses an action**: `ALLOW`, `FLAG`, `BLOCK`, or `MONITOR`.
 5. **The environment updates**: the AMM state evolves (reserves shift from simulated trades), `bot_confidence` adjusts based on whether the agent's action was correct, and the next observation is generated.
-6. **After all steps**, the episode is graded across five weighted dimensions.
+6. **After all steps**, the episode is scored across five weighted dimensions.
 
 The key challenge is that **bots adapt**: successful blocks reduce bot confidence (fewer future attacks), but missed detections embolden the bot. Additionally, normal market activity can produce **noise spikes** (14-15% chance per step) that mimic suspicious signals, creating a false-positive trap.
 
@@ -136,7 +136,7 @@ Legacy trading and liquidity-management actions have been removed from the envir
 
 ---
 
-## Reward Logic and Grading
+## Reward Logic and Scoring
 
 Reward is shaped for **partial credit** — the agent does not need a perfect binary classifier to score well.
 
@@ -172,7 +172,7 @@ A score of `>= 0.6` is considered a passing episode.
 
 ## Tasks
 
-The benchmark includes three deterministic tasks with escalating difficulty. **Judges will clone it, run `python inference.py`, and evaluate the `[START]`, `[STEP]`, and `[END]` stdout logs.** By default, `inference.py` runs `full_market_surveillance`. may also run the other tasks individually by setting `MEVERSE_TASK`. For local testing, you can select a specific task with `MEVERSE_TASK="burst_detection" python inference.py`.
+The benchmark includes three deterministic tasks with escalating difficulty. **Running `python inference.py` executes all three tasks sequentially**, producing `[START]`, `[STEP]`, and `[END]` stdout logs for each task.
 
 ### `burst_detection` 
 
@@ -184,7 +184,7 @@ The agent faces sustained, rhythmic coordination trades that aren't necessarily 
 
 ### `full_market_surveillance`
 
-Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst type and pattern type attacks. Initial bot confidence: **0.30**. **This is the default task when you run `python inference.py` without setting `MEVERSE_TASK`**, which is why you see exactly 60 `[STEP]` logs in a default run.
+Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst type and pattern type attacks. Initial bot confidence: **0.30**. This task produces 60 `[STEP]` logs.
 
 ---
 
@@ -192,7 +192,7 @@ Both threats at once, mixed with normal traffic. The agent must simultaneously a
 
 ### LLM Policy (Official Baseline)
 
-The primary submitted baseline in `inference.py`. It sends each observation as a JSON payload to an LLM (via OpenAI-compatible API) with a structured system prompt containing surveillance rules. The LLM returns a JSON action. If the LLM call fails or returns an invalid action, it falls back to the heuristic policy.
+The primary baseline in `inference.py`. It sends each observation as a JSON payload to an LLM (via OpenAI-compatible API) with a structured system prompt containing surveillance rules. The LLM returns a JSON action. If the LLM call fails or returns an invalid action, it falls back to the heuristic policy.
 
 ### Heuristic Policy (Fallback)
 
@@ -204,7 +204,7 @@ A simple threshold based rule engine in `meverse/baseline_policy.py`:
 - `suspiciousness_score >= 0.52` → `MONITOR`
 - Otherwise → `ALLOW`
 
-This exists for crash recovery and as a benchmark floor not as   the submitted baseline.
+This exists for crash recovery and as a benchmark floor.
 
 ### Dashboard Comparison Baselines
 
@@ -218,14 +218,11 @@ These are edge cases that we should cover in our policy not only the heuristic p
 
 ### `inference.py` — Run the official benchmark
 
-The competition entrypoint. Runs one episode of the LLM-driven surveillance policy and prints structured `[START]`, `[STEP]`, `[END]` logs to stdout.
+The competition entrypoint. Runs all three tasks sequentially (burst_detection, pattern_manipulation_detection, full_market_surveillance) and prints structured `[START]`, `[STEP]`, `[END]` logs to stdout for each task.
 
 ```bash
-# Default: runs full_market_surveillance task
+# Run all three tasks
 python inference.py
-
-# Select a specific task
-MEVERSE_TASK="burst_detection" python inference.py
 
 # With debug telemetry
 DEBUG_TELEMETRY=1 python inference.py
@@ -286,11 +283,19 @@ openenv validate
 Inference logs follow a structured format on stdout:
 
 ```
-[START] task=full_market_surveillance env=amm-market-surveillance model=Qwen/Qwen2.5-72B-Instruct
+[START] task=burst_detection env=amm-market-surveillance model=Qwen/Qwen2.5-72B-Instruct
 [STEP] step=1 action=ALLOW reward=0.85 done=false error=null
 [STEP] step=2 action=BLOCK reward=1.00 done=false error=null
 ...
-[END] success=true steps=60 rewards=0.85,1.00,...
+[END] success=true steps=50 score=0.9997 rewards=0.85,1.00,...
+
+[START] task=pattern_manipulation_detection env=amm-market-surveillance model=Qwen/Qwen2.5-72B-Instruct
+...
+[END] success=true steps=50 score=0.6041 rewards=...
+
+[START] task=full_market_surveillance env=amm-market-surveillance model=Qwen/Qwen2.5-72B-Instruct
+...
+[END] success=true steps=60 score=0.6185 rewards=...
 ```
 
 For richer step by step data (observations, hidden labels, AMM state transitions), enable debug telemetry:
@@ -310,7 +315,7 @@ Telemetry files are JSONL and can be replayed in the dashboard's Telemetry Viewe
 | `API_BASE_URL` | For LLM | `https://router.huggingface.co/v1` | OpenAI-compatible API endpoint |
 | `MODEL_NAME` | For LLM | `Qwen/Qwen2.5-72B-Instruct` | Model identifier for the LLM policy |
 | `HF_TOKEN` | For LLM | — | Hugging Face API token. Without this, the run falls back to heuristic. |
-| `MEVERSE_TASK` | No | `full_market_surveillance` | Which task to run (also accepts `TASK_NAME`) |
+| `MEVERSE_TASK` | No | all tasks | When set, runs only the specified task (also accepts `TASK_NAME`). By default, all three tasks run sequentially. |
 | `EVAL_MODE` | No | `true` | Fixed-seed deterministic mode for reproducible scores |
 | `DEMO_MODE` | No | `false` | Adds bounded variation for local exploration. **Overrides EVAL_MODE.** |
 | `DEBUG_TELEMETRY` | No | `false` | Writes step-by-step JSONL telemetry to disk |
@@ -343,7 +348,7 @@ TradeX1/
 ├── openenv.yaml              # OpenEnv metadata and task definitions
 ├── Dockerfile                # Multi-stage Docker build (uv-based)
 ├── requirements.txt          # Root-level Python dependencies
-├── validate_submission.sh    # Submission validation script
+├── validate_submission.sh    # Environment validation script
 ├── telemetry/                # Debug telemetry output directory
 ├── docs/                     # Detailed documentation
 │   ├── Dashboard.md          # Dashboard visualizations reference
@@ -352,7 +357,7 @@ TradeX1/
     ├── __init__.py           # Package exports
     ├── amm.py                # Constant-product AMM state machine and procedural generation
     ├── models.py             # Pydantic models (SurveillanceAction, SurveillanceObservation)
-    ├── tasks.py              # Task definitions, step generation, and grading logic
+    ├── tasks.py              # Task definitions, step generation, and scoring logic
     ├── baseline_policy.py    # Threshold-based heuristic fallback policy
     ├── policy.py             # LLM policy config, client builder, action selection
     ├── client.py             # Environment client wrapper
@@ -373,17 +378,15 @@ Detailed documentation for the UI components is available in the `docs/` folder:
 
 ---
 
-## For Judges
+## Quick Start
 
-This repository is intended to be evaluated in deterministic competition mode.
-
-- **Entrypoint**: `inference.py` (root)
-- **Submission artifacts**: `Dockerfile` and `openenv.yaml` (root)
+- **Entrypoint**: `python inference.py` — runs all three tasks in deterministic mode
+- **Artifacts**: `Dockerfile` and `openenv.yaml` (root)
 - **Required env vars**: `API_BASE_URL`, `MODEL_NAME`, `HF_TOKEN`
 - **Mode**: `EVAL_MODE=true` and `DEMO_MODE=false` for fixed-seed reproducibility
-- The **LLM-driven policy** is the official baseline path
-- The **heuristic policy** is a crash fallback only, not the submitted baseline
-- `dashboard.py` is for visualization/debugging, for seeing how the policy performs on a single episode.
+- The **LLM-driven policy** is the primary baseline
+- The **heuristic policy** is a crash fallback only
+- `dashboard.py` provides visualization and debugging for single episodes
 
 ---
 
@@ -403,7 +406,7 @@ It is important to be transparent about what the current version does **not** do
 
 ### Learnable Reward Weights
 
-The current grading function uses hardcoded weights: Detection 50%, False Positive 20%, False Negative 15%, Health 10%, Overblocking 5%. These weights encode a specific value judgment about what matters most in surveillance. A future version could allow the **reward function itself to become a learned component** the agent (or a meta-learning loop) would propose and refine these weights based on trajectory outcomes, environmental feedback, and task-specific objectives. This moves toward reward-shaping as a first-class optimization target rather than a fixed design decision.
+The current scoring function uses hardcoded weights: Detection 50%, False Positive 20%, False Negative 15%, Health 10%, Overblocking 5%. These weights encode a specific value judgment about what matters most in surveillance. A future version could allow the **reward function itself to become a learned component** the agent (or a meta-learning loop) would propose and refine these weights based on trajectory outcomes, environmental feedback, and task-specific objectives. This moves toward reward-shaping as a first-class optimization target rather than a fixed design decision.
 
 ### The Broader Vision — MEV Surveillance as a Benchmark Domain
 
