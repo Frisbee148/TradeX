@@ -204,7 +204,7 @@ A simple threshold based rule engine in `meverse/baseline_policy.py`:
 - `suspiciousness_score >= 0.52` → `MONITOR`
 - Otherwise → `ALLOW`
 
-This exists for crash recovery and as a benchmark floor not as the submitted baseline.
+This exists for crash recovery and as a benchmark floor not as   the submitted baseline.
 
 ### Dashboard Comparison Baselines
 
