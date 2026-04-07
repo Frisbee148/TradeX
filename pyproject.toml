@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amm-market-surveillance"
+version = "0.1.0"
+description = "Bot-aware AMM market surveillance environment for OpenEnv"
+requires-python = ">=3.10"
+dependencies = [
+    "gradio>=6.11.0",
+    "plotly>=5.24.0",
+    "numpy>=1.26.0",
+    "openenv-core[core]>=0.2.2",
+    "fastapi>=0.115.0",
+    "uvicorn>=0.24.0",
+]
+
+[project.scripts]
+server = "server.app:main"
