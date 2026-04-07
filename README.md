@@ -7,11 +7,11 @@ sdk: docker
 pinned: false
 ---
 
-# TradeX: Bot-Aware Market Surveillance in Simulated AMM Trading
+# TradeX: Bot Aware Market Surveillance in Simulated AMM Trading
 
-TradeX is a reinforcement-learning benchmark environment built on the [OpenEnv](https://github.com/openenv) framework. It simulates a constant-product Automated Market Maker (AMM) pool and asks an AI agent to act as a **market surveillance controller** — detecting suspicious bot-driven trading activity in real time while preserving healthy market participation.
+TradeX is a reinforcement learning benchmark environment built on the [OpenEnv](https://github.com/openenv) framework. It simulates a constant product Automated Market Maker (AMM) pool and asks an AI agent to act as a **market surveillance controller** — detecting suspicious bot driven trading activity in real time while preserving healthy market participation.
 
-This is **not** a trading bot, DeFi product, wallet, liquidity manager, or blockchain integration demo. It is a decision-intelligence environment where the agent's only job is to classify each window of market activity and choose the correct intervention.
+This is **not** a trading bot, DeFi product, wallet, liquidity manager, or blockchain integration demo. It is a decision intelligence environment where the agent's only job is to classify each window of market activity and choose the correct intervention.
 
 ---
 
@@ -40,7 +40,7 @@ Understanding the following terms is essential to reading this codebase and inte
 
 ### AMM (Automated Market Maker)
 
-An AMM is a decentralized exchange mechanism that uses a mathematical formula to price assets instead of a traditional order book. TradeX simulates a **constant-product AMM** (`x * y = k`), where `reserve_x` and `reserve_y` are the two token reserves in the pool. The price of the asset is determined by the ratio `reserve_y / reserve_x`. When a trade occurs, tokens are added to one side and removed from the other, keeping the product `k` constant. This is the same model used by protocols like Uniswap v2.
+An AMM is a decentralized exchange mechanism that uses a mathematical formula to price assets instead of a traditional order book. TradeX simulates a **constant product AMM** (`x * y = k`), where `reserve_x` and `reserve_y` are the two token reserves in the pool. The price of the asset is determined by the ratio `reserve_y / reserve_x`. When a trade occurs, tokens are added to one side and removed from the other, keeping the product `k` constant. This is the same model used by protocols like Uniswap v2.
 
 ### Liquidity
 
@@ -48,7 +48,7 @@ Liquidity measures how much capital is available in the AMM pool to absorb trade
 
 ### Slippage
 
-Slippage is the difference between the expected price of a trade and the actual execution price. In a constant-product AMM, every trade moves the price — larger trades cause more slippage. The field `recent_slippage_impact` in the observation space captures the magnitude of this price displacement across recent trades. High slippage on small trades is a red flag for manipulation, because it suggests the pool is being deliberately pushed to extreme price points.
+Slippage is the difference between the expected price of a trade and the actual execution price. In a constant product AMM, every trade moves the price  larger trades cause more slippage. The field `recent_slippage_impact` in the observation space captures the magnitude of this price displacement across recent trades. High slippage on small trades is a red flag for manipulation, because it suggests the pool is being deliberately pushed to extreme price points.
 
 ### MEV (Maximal Extractable Value)
 
@@ -59,7 +59,7 @@ MEV refers to the profit that can be extracted by reordering, inserting, or cens
 - **JIT (Just-In-Time) liquidity**: A bot adds liquidity to a pool moments before a large trade to earn fees, then removes it immediately after.
 - **Backrunning / arbitrage**: A bot places a trade immediately after a large price-moving transaction to capture the resulting arbitrage.
 
-In TradeX, the simulated bots exhibit **MEV-like behavior patterns** — rapid bursts of trades, suspiciously regular timing intervals, and coordinated size signatures — that the surveillance agent must learn to detect.
+In TradeX, the simulated bots exhibit **MEV-like behavior patterns** — rapid bursts of trades, suspiciously regular timing intervals, and coordinated size signatures that the surveillance agent must learn to detect.
 
 ### Bot Confidence
 
@@ -67,11 +67,11 @@ An internal simulation parameter (`bot_confidence`, range 0.0–1.0) that contro
 
 ### Burst Indicator
 
-A float (0.0–1.0) representing how much the current trading window looks like an acute, high-frequency burst — many trades crammed into a short time window. High burst values suggest a bot hammering the pool rapidly, typical of sandwich attacks or aggressive frontrunning.
+A float (0.0–1.0) representing how much the current trading window looks like an acute, high-frequency burst many trades crammed into a short time window. High burst values suggest a bot hammering the pool rapidly, typical of sandwich attacks or aggressive frontrunning.
 
 ### Pattern Indicator
 
-A float (0.0–1.0) representing how rhythmic or coordinated the recent trading pattern looks. High pattern values suggest repeated timing intervals and size signatures that are unlikely to occur organically — characteristic of algorithmic manipulation bots operating on a fixed schedule.
+A float (0.0–1.0) representing how rhythmic or coordinated the recent trading pattern looks. High pattern values suggest repeated timing intervals and size signatures that are unlikely to occur organically characteristic of algorithmic manipulation bots operating on a fixed schedule.
 
 ### Suspiciousness Score
 
@@ -92,13 +92,13 @@ A float (0.0–1.0) that specifically captures how much the current activity loo
 5. **The environment updates**: the AMM state evolves (reserves shift from simulated trades), `bot_confidence` adjusts based on whether the agent's action was correct, and the next observation is generated.
 6. **After all steps**, the episode is graded across five weighted dimensions.
 
-The key challenge is that **bots adapt**: successful blocks reduce bot confidence (fewer future attacks), but missed detections embolden the bot. Additionally, normal market activity can produce **noise spikes** (15% chance per step) that mimic suspicious signals, creating a false-positive trap.
+The key challenge is that **bots adapt**: successful blocks reduce bot confidence (fewer future attacks), but missed detections embolden the bot. Additionally, normal market activity can produce **noise spikes** (14-15% chance per step) that mimic suspicious signals, creating a false-positive trap.
 
 ---
 
 ## Observation Space
 
-Each step returns a fixed-size structured observation with these surveillance signals:
+Each step returns a fixed size structured observation with these surveillance signals:
 
 | Field | Type | Description |
 |---|---|---|
@@ -127,10 +127,10 @@ The agent must choose exactly one of four actions per step:
 
 | Action | Meaning | When to Use |
 |---|---|---|
-| `ALLOW` | Let the activity pass as normal | Organic, healthy trading — no red flags |
-| `MONITOR` | Watch more closely without intervening | Mildly elevated signals — not enough to escalate |
+| `ALLOW` | Let the activity pass as normal | Organic, healthy trading no red flags |
+| `MONITOR` | Watch more closely without intervening | Mildly elevated signals not enough to escalate |
 | `FLAG` | Mark as suspicious for review | Clear suspicious indicators but not extreme |
-| `BLOCK` | Stop the activity — strongly suspicious or harmful | High-confidence manipulation or burst attack |
+| `BLOCK` | Stop the activity strongly suspicious or harmful | High-confidence manipulation or burst attack |
 
 Legacy trading and liquidity-management actions have been removed from the environment.
 
@@ -172,19 +172,19 @@ A score of `>= 0.6` is considered a passing episode.
 
 ## Tasks
 
-The benchmark includes three deterministic tasks with escalating difficulty. **For hackathon submission, you submit your GitHub repo. Judges will clone it, run `python inference.py`, and evaluate the `[START]`, `[STEP]`, and `[END]` stdout logs.** By default, `inference.py` runs `full_market_surveillance`. Judges may also run the other tasks individually by setting `MEVERSE_TASK`. For local testing, you can select a specific task with `MEVERSE_TASK="burst_detection" python inference.py`.
+The benchmark includes three deterministic tasks with escalating difficulty. **Judges will clone it, run `python inference.py`, and evaluate the `[START]`, `[STEP]`, and `[END]` stdout logs.** By default, `inference.py` runs `full_market_surveillance`. may also run the other tasks individually by setting `MEVERSE_TASK`. For local testing, you can select a specific task with `MEVERSE_TASK="burst_detection" python inference.py`.
 
-### `burst_detection` (Easy — 50 steps)
+### `burst_detection` 
 
-The agent faces sudden, acute spikes — a bot hammering the pool with high-volume trades in a short window. The primary signal is `burst_indicator` going high. Activity is concentrated in time. A simple threshold rule can mostly catch it. Initial bot confidence: **0.25**.
+The agent faces sudden, acute spikes — a bot hammering the pool with high volume trades in a short window. The primary signal is `burst_indicator` going high. Activity is concentrated in time. A simple threshold rule can mostly catch it. Initial bot confidence: **0.25**.
 
-### `pattern_manipulation_detection` (Medium — 50 steps)
+### `pattern_manipulation_detection`
 
-The agent faces sustained, rhythmic coordination — trades that aren't necessarily bursty but repeat at suspicious timing intervals or with suspicious size signatures. The signal is `pattern_indicator` combined with `time_gap_min` being suspiciously regular. A bot can have low burst but high pattern. This is harder because individually each trade looks benign. Initial bot confidence: **0.35**.
+The agent faces sustained, rhythmic coordination trades that aren't necessarily bursty but repeat at suspicious timing intervals or with suspicious size signatures. The signal is `pattern_indicator` combined with `time_gap_min` being suspiciously regular. A bot can have low burst but high pattern. This is harder because individually each trade looks benign. Initial bot confidence: **0.35**.
 
-### `full_market_surveillance` (Hard — 60 steps)
+### `full_market_surveillance`
 
-Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst-type and pattern-type attacks. Initial bot confidence: **0.30**. **This is the default task when you run `python inference.py` without setting `MEVERSE_TASK`**, which is why you see exactly 60 `[STEP]` logs in a default run.
+Both threats at once, mixed with normal traffic. The agent must simultaneously avoid false positives on organic noise and catch both burst type and pattern type attacks. Initial bot confidence: **0.30**. **This is the default task when you run `python inference.py` without setting `MEVERSE_TASK`**, which is why you see exactly 60 `[STEP]` logs in a default run.
 
 ---
 
@@ -196,7 +196,7 @@ The primary submitted baseline in `inference.py`. It sends each observation as a
 
 ### Heuristic Policy (Fallback)
 
-A simple threshold-based rule engine in `meverse/baseline_policy.py`:
+A simple threshold based rule engine in `meverse/baseline_policy.py`:
 
 - `pattern_indicator >= 0.72` AND `slippage >= 0.055` → `BLOCK`
 - `manipulation_score >= 0.78` → `BLOCK`
@@ -204,10 +204,11 @@ A simple threshold-based rule engine in `meverse/baseline_policy.py`:
 - `suspiciousness_score >= 0.52` → `MONITOR`
 - Otherwise → `ALLOW`
 
-This exists for crash recovery and as a benchmark floor — not as the submitted baseline.
+This exists for crash recovery and as a benchmark floor not as the submitted baseline.
 
 ### Dashboard Comparison Baselines
 
+These are edge cases that we should cover in our policy not only the heuristic policy.
 - **Always Allow**: Returns `ALLOW` every step. Sanity-check lower bound.
 - **Random**: Picks randomly from all four actions. Noise baseline.
 
@@ -292,7 +293,7 @@ Inference logs follow a structured format on stdout:
 [END] success=true steps=60 rewards=0.85,1.00,...
 ```
 
-For richer step-by-step data (observations, hidden labels, AMM state transitions), enable debug telemetry:
+For richer step by step data (observations, hidden labels, AMM state transitions), enable debug telemetry:
 
 ```bash
 DEBUG_TELEMETRY=1 DEBUG_TELEMETRY_PATH=telemetry/debug.jsonl python inference.py
@@ -382,7 +383,7 @@ This repository is intended to be evaluated in deterministic competition mode.
 - **Mode**: `EVAL_MODE=true` and `DEMO_MODE=false` for fixed-seed reproducibility
 - The **LLM-driven policy** is the official baseline path
 - The **heuristic policy** is a crash fallback only, not the submitted baseline
-- `dashboard.py` is for visualization/debugging, not judging
+- `dashboard.py` is for visualization/debugging, for seeing how the policy performs on a single episode.
 
 ---
 
@@ -390,20 +391,20 @@ This repository is intended to be evaluated in deterministic competition mode.
 
 ### End-to-End MEV Attack Replay
 
-Currently, TradeX generates synthetic bot behavior through procedural simulation — probabilistic rolls against `bot_confidence` produce burst and pattern signals that approximate real MEV strategies. The natural next step is to **replay actual on-chain MEV transactions** against a live or forked AMM state. By feeding real sandwich attacks, JIT liquidity events, and frontrunning sequences through the environment, the benchmark would shift from "detect synthetic bots" to "detect real adversarial MEV strategies as they appeared on mainnet." This would require integrating with an archive node or a mempool replay service and mapping raw transaction traces into the observation schema the agent already understands.
+Currently, TradeX generates synthetic bot behavior through procedural simulation probabilistic rolls against `bot_confidence` produce burst and pattern signals that approximate real MEV strategies. The natural next step is to **replay actual on-chain MEV transactions** against a live or forked AMM state. By feeding real sandwich attacks, JIT liquidity events, and frontrunning sequences through the environment, the benchmark would shift from "detect synthetic bots" to "detect real adversarial MEV strategies as they appeared on mainnet." This would require integrating with an archive node or a mempool replay service and mapping raw transaction traces into the observation schema the agent already understands.
 
 ### Closing the RL Loop — From Evaluation to Training
 
-Right now, the LLM agent is **evaluated but not trained** within this environment. The reward signal is computed and logged, but it never flows back into the model's weights. The logical next step is closing that loop — using the per-step reward signal to fine-tune or RLHF-align the agent's surveillance policy, so the model itself improves from repeated exposure to the environment. This turns TradeX from a static benchmark into an active training harness where the agent's detection accuracy compounds over episodes. Integration with the MEV environment we have built would allow the agent to train against increasingly adversarial bot strategies in a curriculum-learning setup.
+Right now, the LLM agent is **evaluated but not trained** within this environment. The reward signal is computed and logged, but it never flows back into the model's weights. The logical next step is closing that loop using the per-step reward signal to fine-tune or RLHF-align the agent's surveillance policy, so the model itself improves from repeated exposure to the environment. This turns TradeX from a static benchmark into an active training harness where the agent's detection accuracy compounds over episodes. Integration with the MEV environment we have built would allow the agent to train against increasingly adversarial bot strategies in a curriculum-learning setup.
 
 ### Honest Design Constraints
 
-It is important to be transparent about what the current version does **not** do. Liquidity is initialized at fixed reserves and evolves only through simulated trades — there is no real-time market data integration, no live price feeds, and no connection to on-chain state. Seeded determinism is used for reproducibility, which means that in `EVAL_MODE` every run produces the exact same observation sequence. Predictions are based entirely on simulation parameters, not actual market conditions. The bot behavior, while adaptive (stealth mechanics, confidence-based intensity), is still procedurally generated and does not capture the full complexity of real-world MEV actors who coordinate across multiple pools, tokens, and protocols simultaneously.
+It is important to be transparent about what the current version does **not** do. Liquidity is initialized at fixed reserves and evolves only through simulated trades there is no real time market data integration, no live price feeds, and no connection to on-chain state. Seeded determinism is used for reproducibility, which means that in `EVAL_MODE` every run produces the exact same observation sequence. Predictions are based entirely on simulation parameters, not actual market conditions. The bot behavior, while adaptive (stealth mechanics, confidence based intensity), is still procedurally generated and does not capture the full complexity of real-world MEV actors who coordinate across multiple pools, tokens, and protocols simultaneously.
 
 ### Learnable Reward Weights
 
-The current grading function uses hardcoded weights: Detection 50%, False Positive 20%, False Negative 15%, Health 10%, Overblocking 5%. These weights encode a specific value judgment about what matters most in surveillance. A future version could allow the **reward function itself to become a learned component** — the agent (or a meta-learning loop) would propose and refine these weights based on trajectory outcomes, environmental feedback, and task-specific objectives. This moves toward reward-shaping as a first-class optimization target rather than a fixed design decision.
+The current grading function uses hardcoded weights: Detection 50%, False Positive 20%, False Negative 15%, Health 10%, Overblocking 5%. These weights encode a specific value judgment about what matters most in surveillance. A future version could allow the **reward function itself to become a learned component** the agent (or a meta-learning loop) would propose and refine these weights based on trajectory outcomes, environmental feedback, and task-specific objectives. This moves toward reward-shaping as a first-class optimization target rather than a fixed design decision.
 
 ### The Broader Vision — MEV Surveillance as a Benchmark Domain
 
-MEV surveillance sits at the intersection of **adversarial machine learning**, **DeFi security**, and **agent evaluation** — three fields that are individually well-studied but rarely combined into a single benchmark. No standardized OpenEnv benchmark currently exists for this problem class. TradeX is a step toward establishing MEV detection as a repeatable, scorable, and comparable evaluation domain where different agent architectures (LLMs, RL policies, hybrid systems) can be measured against the same adversarial scenarios. The long-term goal is a benchmark suite where the environment, the attacker, and the defender all co-evolve — producing increasingly realistic and challenging surveillance problems that push the frontier of what AI agents can detect in decentralized financial systems.
+MEV surveillance sits at the intersection of **adversarial machine learning**, **DeFi security**, and **agent evaluation** three fields that are individually well-studied but rarely combined into a single benchmark. No standardized OpenEnv benchmark currently exists for this problem class. TradeX is a step toward establishing MEV detection as a repeatable, scorable, and comparable evaluation domain where different agent architectures (LLMs, RL policies, hybrid systems) can be measured against the same adversarial scenarios. The long-term goal is a benchmark suite where the environment, the attacker, and the defender all co-evolve producing increasingly realistic and challenging surveillance problems that push the frontier of what AI agents can detect in decentralized financial systems.
