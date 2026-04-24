@@ -1,279 +1,417 @@
-"""Competition-style inference runner for the surveillance benchmark."""
+"""
+Inference Script — MEVerse (RLiquidity V3) + Self-Improving Environment
+======================================================================
+
+Runs MEVerse and prints the standard OpenEnv [START]/[STEP]/[END] log
+format. By default it drives the in-process ``MeverseEnvironment`` so you
+can see the environment working without Docker or any LLM credentials.
+
+Run modes (pick one):
+
+  # default: SIE loop, heuristic policy, in-process env (no Docker, no LLM)
+  python inference.py
+
+  # same but a single episode
+  python inference.py --episodes 1
+
+  # use an LLM (requires HF_TOKEN or OPENAI_API_KEY set)
+  python inference.py --llm
+
+  # talk to a remote OpenEnv server (requires MEVERSE_BASE_URL)
+  python inference.py --remote --llm
+
+  # talk to a local Docker image (requires LOCAL_IMAGE_NAME)
+  python inference.py --docker --llm
+
+Env vars used when --llm is passed:
+    API_BASE_URL   LLM endpoint (default https://router.huggingface.co/v1)
+    MODEL_NAME     Model id (default Qwen/Qwen2.5-72B-Instruct)
+    HF_TOKEN       API key (also accepts OPENAI_API_KEY / API_KEY)
+
+STDOUT FORMAT (per episode)
+    [START] task=<task> env=meverse model=<model> episode=<n>
+    [STEP]  step=<n> action=<json> reward=<r> done=<bool> error=<msg|null>
+    [END]   success=<bool> steps=<n> rewards=<r1,r2,...>
+    [SIE]   episode=<n> score=<s> mev_avoid=<m> phase=<p> dominant=<bot> weights=<...>
+"""
 
 from __future__ import annotations
 
+import argparse
+import asyncio
 import json
 import os
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Optional
+import random
+import sys
+import textwrap
+from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
+from meverse import EnvController, MeverseAction, MeverseObservation
+from meverse.server.meverse_environment import MeverseEnvironment
 
-from meverse.env import load_repo_env
-from meverse import SurveillanceAction, choose_surveillance_action, list_task_names
-from meverse.server.meverse_environment import MarketSurveillanceEnvironment
+API_BASE_URL = os.getenv("API_BASE_URL") or "https://router.huggingface.co/v1"
+MODEL_NAME = os.getenv("MODEL_NAME") or "Qwen/Qwen2.5-72B-Instruct"
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY") or os.getenv("API_KEY")
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME") or os.getenv("IMAGE_NAME")
+MEVERSE_BASE_URL = os.getenv("MEVERSE_BASE_URL")
+TEMPERATURE = 0.7
+MAX_TOKENS = 300
+SUCCESS_SCORE_THRESHOLD = 0.3
+BENCHMARK = "meverse"
 
-load_repo_env()
+SYSTEM_PROMPT = textwrap.dedent(
+    """\
+    You are an expert DeFi trader in a simulated Uniswap V3 ETH/USDC pool.
+    Maximize portfolio value while dodging MEV attacks.
 
-API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
-MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN", "")
-TASK_NAME = os.getenv("MEVERSE_TASK") or os.getenv("TASK_NAME") or "full_market_surveillance"
-BENCHMARK = "amm-market-surveillance"
+    Signals:
+    - jit_liquidity > 0 at current tick → JIT bot staged. Use private RPC or split_swap.
+    - Multiple mempool txs → sandwich risk. Use split_swap or private RPC.
+    - Low active_liquidity → price impact high. Reduce size or hold.
 
+    Actions (JSON only, no markdown):
+      swap_exact_in     {"amount_in": float, "zero_for_one": bool, "use_private_rpc": bool}
+      split_swap        {"total_amount": float, "num_splits": int, "zero_for_one": bool}
+      add_liquidity     {"tick_lower": int, "tick_upper": int, "amount0_desired": float, "amount1_desired": float}
+      remove_liquidity  {"position_id": str}
+      range_order       {"tick_lower": int, "tick_upper": int, "token": "token0"|"token1", "amount": float}
+      jit_liquidity     {"tick_lower": int, "tick_upper": int, "amount0": float, "amount1": float}
+      hold              {}
+      close_episode     {}
 
-def env_flag(name: str, default: bool) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def log_start(task: str, env: str, model: str) -> None:
-    print(f"[START] task={task} env={env} model={model}", flush=True)
-
-
-def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    error_value = error if error else "null"
-    print(f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_value}", flush=True)
-
-
-def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    reward_text = ",".join(f"{reward:.2f}" for reward in rewards)
-    print(f"[END] success={str(success).lower()} steps={steps} score={score:.4f} rewards={reward_text}", flush=True)
-
-
-def build_signal_snapshot(observation) -> dict[str, Any]:
-    return {
-        "task_name": observation.task_name,
-        "step_num": observation.step_num,
-        "max_steps": observation.max_steps,
-        "done": observation.done,
-        "reward": float(observation.reward or 0.0),
-        "current_amm_price": observation.current_amm_price,
-        "liquidity_snapshot": observation.liquidity_snapshot,
-        "recent_trade_count": observation.recent_trade_count,
-        "trades_in_window": observation.trades_in_window,
-        "trade_frequency": observation.trade_frequency,
-        "average_trade_size": observation.average_trade_size,
-        "maximum_trade_size": observation.maximum_trade_size,
-        "recent_slippage_impact": observation.recent_slippage_impact,
-        "time_gap_mean": observation.time_gap_mean,
-        "time_gap_min": observation.time_gap_min,
-        "recent_time_gaps": observation.recent_time_gaps,
-        "recent_price_impacts": observation.recent_price_impacts,
-        "burst_indicator": observation.burst_indicator,
-        "pattern_indicator": observation.pattern_indicator,
-        "suspiciousness_score": observation.suspiciousness_score,
-        "manipulation_score": observation.manipulation_score,
-        "metadata": {
-            "episode_id": observation.metadata.get("episode_id"),
-            "seed": observation.metadata.get("seed"),
-            "eval_mode": observation.metadata.get("eval_mode"),
-            "demo_mode": observation.metadata.get("demo_mode"),
-            "scenario_note": observation.metadata.get("scenario_note"),
-            "amm_price": observation.metadata.get("amm_price"),
-            "amm_liquidity": observation.metadata.get("amm_liquidity"),
-            "bot_confidence": observation.metadata.get("bot_confidence"),
-            "last_action_error": observation.metadata.get("last_action_error"),
-        },
-    }
+    Respond with exactly one JSON object: {"action_type": "...", "params": {...}}
+    """
+)
 
 
-class DebugTelemetryWriter:
-    """Write detailed episode telemetry to JSONL without touching stdout logs."""
+# ──────────────────────────────────────────────
+#  Log helpers
+# ──────────────────────────────────────────────
 
-    def __init__(self, enabled: bool, task_name: str):
-        self.enabled = enabled
-        self.path: Optional[Path] = None
-        if not enabled:
-            return
-        configured_path = os.getenv("DEBUG_TELEMETRY_PATH", "").strip()
-        if configured_path:
-            self.path = Path(configured_path)
-        else:
-            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            self.path = Path("telemetry") / f"{task_name}-{stamp}.jsonl"
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+def log_start(task: str, model: str, episode: int) -> None:
+    print(f"[START] task={task} env={BENCHMARK} model={model} episode={episode}", flush=True)
 
-    def write(self, event: str, payload: dict[str, Any]) -> None:
-        if not self.enabled or self.path is None:
-            return
-        record = {
-            "event": event,
-            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
-            **payload,
+
+def log_step(step: int, action_json: str, reward: float, done: bool, error: Optional[str]) -> None:
+    err = error if error else "null"
+    print(
+        f"[STEP] step={step} action={action_json} reward={reward:.2f} done={str(done).lower()} error={err}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, rewards: List[float]) -> None:
+    rewards_str = ",".join(f"{r:.2f}" for r in rewards)
+    print(f"[END] success={str(success).lower()} steps={steps} rewards={rewards_str}", flush=True)
+
+
+def log_sie(ep: int, controller: EnvController, result) -> None:
+    dominant = max(controller.bot_weights, key=controller.bot_weights.get)
+    weights = ",".join(f"{k}:{v:.2f}" for k, v in controller.bot_weights.items())
+    print(
+        f"[SIE] episode={ep} score={result.final_score:.3f} "
+        f"mev_avoid={result.mev_avoidance_score:.3f} "
+        f"profit={result.profit_score:.3f} "
+        f"fails={len(result.failures)} "
+        f"phase={controller.curriculum_phase} "
+        f"dominant={dominant} weights={weights}",
+        flush=True,
+    )
+
+
+# ──────────────────────────────────────────────
+#  Policies
+# ──────────────────────────────────────────────
+
+def heuristic_policy(obs: MeverseObservation, rng: random.Random) -> Dict[str, Any]:
+    """Cheap defensive policy for wiring tests and no-LLM runs."""
+    mempool = getattr(obs, "mempool", []) or []
+    active_liq = getattr(obs, "active_liquidity", 0.0) or 0.0
+
+    if len(mempool) >= 2:
+        return {
+            "action_type": "swap_exact_in",
+            "params": {"amount_in": 0.2, "zero_for_one": True, "use_private_rpc": True},
         }
-        try:
-            with self.path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(record, sort_keys=True) + "\n")
-        except OSError:
-            # Telemetry must never interfere with the benchmark run.
-            pass
-
-
-def llm_action(client: OpenAI, observation) -> str:
-    prompt = {
-        "task": observation.task_name,
-        "step_num": observation.step_num,
-        "max_steps": observation.max_steps,
-        "current_amm_price": observation.current_amm_price,
-        "liquidity_snapshot": observation.liquidity_snapshot,
-        "recent_trade_count": observation.recent_trade_count,
-        "trades_in_window": observation.trades_in_window,
-        "trade_frequency": observation.trade_frequency,
-        "average_trade_size": observation.average_trade_size,
-        "maximum_trade_size": observation.maximum_trade_size,
-        "recent_slippage_impact": observation.recent_slippage_impact,
-        "time_gap_mean": observation.time_gap_mean,
-        "time_gap_min": observation.time_gap_min,
-        "burst_indicator": observation.burst_indicator,
-        "pattern_indicator": observation.pattern_indicator,
-        "suspiciousness_score": observation.suspiciousness_score,
-        "manipulation_score": observation.manipulation_score,
-    }
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        temperature=0.0,
-        max_tokens=12,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are a market surveillance controller in a simulated AMM market. "
-                    "Your job: detect suspicious bot-like activity and respond decisively, "
-                    "but NEVER penalize normal healthy trading.\n"
-                    "Actions: ALLOW, FLAG, BLOCK, MONITOR.\n"
-                    "Rules (apply in order, stop at first match):\n"
-                    "1. manipulation_score >= 0.55 → BLOCK\n"
-                    "2. trade_frequency >= 7.0 AND time_gap_min < 0.5 → BLOCK\n"
-                    "3. burst_indicator >= 0.50 AND suspiciousness_score >= 0.45 → BLOCK\n"
-                    "4. suspiciousness_score >= 0.50 AND pattern_indicator >= 0.35 → FLAG\n"
-                    "5. trade_frequency >= 5.0 AND average_trade_size > 18 → FLAG\n"
-                    "6. burst_indicator >= 0.35 OR suspiciousness_score >= 0.40 → MONITOR\n"
-                    "7. Otherwise → ALLOW\n"
-                    "Return JSON only: {\"action\": \"ALLOW\"}"
-                ),
+    if active_liq > 0 and rng.random() < 0.5:
+        return {
+            "action_type": "split_swap",
+            "params": {
+                "total_amount": 0.8,
+                "num_splits": 4,
+                "zero_for_one": rng.random() < 0.5,
             },
-            {"role": "user", "content": json.dumps(prompt, separators=(",", ":"))},
-        ],
-    )
-    content = (response.choices[0].message.content or "").strip()
-    if content.startswith("```"):
-        content = content.replace("```json", "").replace("```", "").strip()
-    try:
-        parsed = json.loads(content)
-        action = str(parsed.get("action", "")).strip().upper()
-        if action in {"ALLOW", "FLAG", "BLOCK", "MONITOR"}:
-            return action
-    except Exception:
-        pass
-    return choose_surveillance_action(observation)
-
-
-def select_action(observation) -> str:
-    if HF_TOKEN:
-        try:
-            client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-            return llm_action(client, observation)
-        except Exception:
-            return choose_surveillance_action(observation)
-    return choose_surveillance_action(observation)
-
-
-def run_task(task_name: str) -> None:
-    """Run a single task: reset, step through, grade, and log."""
-    demo_mode = env_flag("DEMO_MODE", False)
-    eval_mode = False if demo_mode else env_flag("EVAL_MODE", True)
-    env = MarketSurveillanceEnvironment(task=task_name, eval_mode=eval_mode, demo_mode=demo_mode)
-    observation = env.reset(task=task_name)
-    telemetry = DebugTelemetryWriter(enabled=env_flag("DEBUG_TELEMETRY", False), task_name=task_name)
-    rewards: list[float] = []
-    steps = 0
-    score = 0.0
-
-    log_start(task_name, BENCHMARK, MODEL_NAME if HF_TOKEN else "heuristic-fallback")
-    telemetry.write(
-        "episode_start",
-        {
-            "task": task_name,
-            "benchmark": BENCHMARK,
-            "model": MODEL_NAME if HF_TOKEN else "heuristic-fallback",
-            "initial_observation": build_signal_snapshot(observation),
-            "environment": env.debug_snapshot(),
+        }
+    if rng.random() < 0.2:
+        return {"action_type": "hold", "params": {}}
+    return {
+        "action_type": "swap_exact_in",
+        "params": {
+            "amount_in": round(rng.uniform(0.3, 1.2), 3),
+            "zero_for_one": rng.random() < 0.5,
+            "use_private_rpc": rng.random() < 0.3,
         },
+    }
+
+
+def build_user_prompt(obs: Any, step: int, last_reward: float, history: List[str]) -> str:
+    history_block = "\n".join(history[-5:]) if history else "None"
+    obs_dict = {
+        "current_tick": obs.current_tick,
+        "current_price": obs.current_price,
+        "active_liquidity": obs.active_liquidity,
+        "tick_distribution": obs.tick_distribution[:5],
+        "agent_token0_ETH": obs.agent_token0,
+        "agent_token1_USDC": obs.agent_token1,
+        "agent_positions": obs.agent_positions,
+        "mempool": obs.mempool,
+        "last_mev_loss": obs.last_mev_loss,
+        "step_num": obs.step_num,
+        "max_steps": obs.max_steps,
+        "task": obs.task_name,
+    }
+    return (
+        f"Step: {step}/{obs.max_steps}\n"
+        f"Last reward: {last_reward:.2f}\n\n"
+        f"Current pool state:\n{json.dumps(obs_dict, indent=2)}\n\n"
+        f"Recent history:\n{history_block}\n\n"
+        f"Choose your next action. Respond with JSON only."
     )
 
-    try:
-        while not observation.done:
-            decision_observation = observation
-            pre_action_debug = env.debug_snapshot()
-            final_action = select_action(observation)
-            observation = env.step(SurveillanceAction(action_type=final_action))
-            steps += 1
-            reward = float(observation.reward or 0.0)
-            rewards.append(reward)
-            telemetry.write(
-                "step",
-                {
-                    "step": steps,
-                    "action": final_action,
-                    "reward": reward,
-                    "done": observation.done,
-                    "decision_observation": build_signal_snapshot(decision_observation),
-                    "returned_observation": build_signal_snapshot(observation),
-                    "pre_action_environment": pre_action_debug,
-                    "post_action_environment": env.debug_snapshot(),
-                },
+
+def llm_policy_factory(client):
+    def _policy(obs, rng: random.Random, step: int, last_reward: float, history: List[str]) -> Dict[str, Any]:
+        fallback = {"action_type": "hold", "params": {}}
+        text = ""
+        try:
+            completion = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": build_user_prompt(obs, step, last_reward, history)},
+                ],
+                temperature=TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                stream=False,
             )
-            log_step(step=steps, action=final_action, reward=reward, done=observation.done, error=observation.metadata.get("last_action_error"))
-        grade = env.grade()
-        score = grade["score"]
-        success = bool(score >= 0.6)
-    except KeyboardInterrupt:
-        success = False
-        telemetry.write(
-            "episode_error",
-            {
-                "steps_completed": steps,
-                "rewards": rewards,
-            },
+            text = (completion.choices[0].message.content or "").strip()
+            if text.startswith("```"):
+                text = "\n".join(
+                    line for line in text.split("\n") if not line.strip().startswith("```")
+                ).strip()
+            action = json.loads(text)
+            if "action_type" not in action:
+                print(f"[DEBUG] missing action_type | raw={text}", file=sys.stderr, flush=True)
+                return fallback
+            action.setdefault("params", {})
+            return action
+        except json.JSONDecodeError as exc:
+            print(f"[DEBUG] JSON parse fail: {exc} | raw={text}", file=sys.stderr, flush=True)
+            return fallback
+        except Exception as exc:
+            print(f"[DEBUG] LLM request failed: {exc}", file=sys.stderr, flush=True)
+            return fallback
+    return _policy
+
+
+# ──────────────────────────────────────────────
+#  Local in-process runner (default)
+# ──────────────────────────────────────────────
+
+def run_local(args: argparse.Namespace) -> None:
+    controller = EnvController(task_name=args.task)
+    env = MeverseEnvironment(task=args.task)
+
+    llm_call = None
+    model_label = "heuristic"
+    if args.llm:
+        if not API_KEY:
+            print(
+                "[DEBUG] --llm requested but no HF_TOKEN/OPENAI_API_KEY set. Falling back to heuristic.",
+                file=sys.stderr,
+                flush=True,
+            )
+        else:
+            try:
+                from openai import OpenAI
+                client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+                llm_call = llm_policy_factory(client)
+                model_label = MODEL_NAME
+            except Exception as exc:
+                print(f"[DEBUG] OpenAI client init failed: {exc}", file=sys.stderr, flush=True)
+
+    print(
+        f"[SIE] task={args.task} episodes={args.episodes} policy={model_label} "
+        f"starting curriculum_phase=0",
+        flush=True,
+    )
+
+    for ep in range(1, args.episodes + 1):
+        sie_config = controller.next_config()
+        seed = args.seed + ep
+        env.reset(seed=seed, task=args.task, sie_config=sie_config)
+        rng = random.Random(seed + 7919)
+
+        log_start(task=args.task, model=model_label, episode=ep)
+        rewards: List[float] = []
+        history: List[str] = []
+        last_reward = 0.0
+        steps_taken = 0
+        done = False
+
+        while not done:
+            obs = env._build_observation(done=False, reward=0.0)
+            if llm_call is not None:
+                action_dict = llm_call(obs, rng, steps_taken + 1, last_reward, history)
+            else:
+                action_dict = heuristic_policy(obs, rng)
+
+            action = MeverseAction(
+                action_type=action_dict.get("action_type", "hold"),
+                params=action_dict.get("params", {}),
+            )
+            next_obs = env.step(action)
+            reward = next_obs.reward or 0.0
+            done = next_obs.done
+            steps_taken += 1
+
+            err = None
+            if getattr(next_obs, "metadata", None):
+                err = next_obs.metadata.get("last_action_error")
+
+            log_step(
+                step=steps_taken,
+                action_json=json.dumps(action_dict, separators=(",", ":"), sort_keys=True),
+                reward=reward,
+                done=done,
+                error=err,
+            )
+            rewards.append(reward)
+            history.append(
+                f"Step {steps_taken}: {action.action_type} -> reward {reward:+.2f}, "
+                f"price={next_obs.current_price}, mev_loss={next_obs.last_mev_loss}"
+            )
+            last_reward = reward
+            if steps_taken >= env._config.max_steps + 5:
+                break
+
+        result = env.build_sie_result()
+        controller.ingest(result)
+        success = result.final_score >= SUCCESS_SCORE_THRESHOLD
+        log_end(success=success, steps=steps_taken, rewards=rewards)
+        log_sie(ep, controller, result)
+
+    print("\n[SIE] final evolution snapshots:", flush=True)
+    for snap in controller.evolution_history():
+        print(
+            f"  ep={snap['episode_id']} score={snap['final_score']:.3f} "
+            f"phase={snap['curriculum_phase']} dom={snap['dominant_bot_type']} "
+            f"fails={snap['num_failures']}",
+            flush=True,
         )
-    except BaseException:
-        success = False
-        telemetry.write(
-            "episode_error",
-            {
-                "steps_completed": steps,
-                "rewards": rewards,
-            },
-        )
-        raise
+
+
+# ──────────────────────────────────────────────
+#  Remote / Docker runner (single episode, LLM only)
+# ──────────────────────────────────────────────
+
+async def run_remote(args: argparse.Namespace) -> None:
+    from meverse import MeverseEnv
+
+    if not API_KEY:
+        raise RuntimeError("Remote mode requires --llm with HF_TOKEN/OPENAI_API_KEY")
+
+    from openai import OpenAI
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY)
+    llm_call = llm_policy_factory(client)
+
+    if args.docker:
+        if not LOCAL_IMAGE_NAME:
+            raise RuntimeError("--docker requires LOCAL_IMAGE_NAME env var")
+        env = await MeverseEnv.from_docker_image(LOCAL_IMAGE_NAME)
+    else:
+        if not MEVERSE_BASE_URL:
+            raise RuntimeError("--remote requires MEVERSE_BASE_URL env var")
+        env = MeverseEnv(base_url=MEVERSE_BASE_URL)
+        await env.connect()
+
+    rng = random.Random(args.seed)
+    log_start(task=args.task, model=MODEL_NAME, episode=1)
+
+    rewards: List[float] = []
+    history: List[str] = []
+    steps_taken = 0
+    success = False
+
+    try:
+        result = await env.reset(task=args.task)
+        obs = result.observation
+        last_reward = 0.0
+        max_steps = max(1, int(obs.max_steps or 1))
+
+        for step in range(1, max_steps + 1):
+            if result.done:
+                break
+            action_dict = llm_call(obs, rng, step, last_reward, history)
+            action = MeverseAction(
+                action_type=action_dict.get("action_type", "hold"),
+                params=action_dict.get("params", {}),
+            )
+            result = await env.step(action)
+            obs = result.observation
+            reward = result.reward or 0.0
+            done = result.done
+            err = obs.metadata.get("last_action_error") if getattr(obs, "metadata", None) else None
+
+            log_step(
+                step=step,
+                action_json=json.dumps(action_dict, separators=(",", ":"), sort_keys=True),
+                reward=reward,
+                done=done,
+                error=err,
+            )
+            rewards.append(reward)
+            last_reward = reward
+            steps_taken = step
+            history.append(
+                f"Step {step}: {action.action_type} -> reward {reward:+.2f}"
+            )
+            if done:
+                break
+
+        max_total_reward = max(1.0, max_steps * 1.0)
+        score = min(1.0, max(0.0, sum(rewards) / max_total_reward))
+        success = score >= SUCCESS_SCORE_THRESHOLD
     finally:
         try:
-            final_grade = env.grade() if steps > 0 else None
-        except Exception:
-            final_grade = None
-        if final_grade:
-            score = final_grade["score"]
-        telemetry.write(
-            "episode_end",
-            {
-                "success": success,
-                "steps": steps,
-                "rewards": rewards,
-                "grade": final_grade,
-                "telemetry_path": str(telemetry.path) if telemetry.path else None,
-            },
-        )
-        log_end(success=success, steps=steps, score=score, rewards=rewards)
+            await env.close()
+        except Exception as exc:
+            print(f"[DEBUG] env.close error: {exc}", file=sys.stderr, flush=True)
+        log_end(success=success, steps=steps_taken, rewards=rewards)
+
+
+# ──────────────────────────────────────────────
+#  CLI
+# ──────────────────────────────────────────────
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="MEVerse inference runner (SIE-aware)")
+    p.add_argument("--task", default=os.getenv("MEVERSE_TASK", "easy"),
+                   choices=["easy", "medium", "hard"])
+    p.add_argument("--episodes", type=int, default=5, help="SIE loop length (local mode)")
+    p.add_argument("--seed", type=int, default=1234)
+    p.add_argument("--llm", action="store_true", help="Use OpenAI-compatible LLM policy")
+    p.add_argument("--remote", action="store_true", help="Talk to MEVERSE_BASE_URL (HTTP)")
+    p.add_argument("--docker", action="store_true", help="Talk to LOCAL_IMAGE_NAME (Docker)")
+    return p.parse_args()
 
 
 def main() -> None:
-    all_tasks = list_task_names()
-    for task_name in all_tasks:
-        run_task(task_name)
+    args = parse_args()
+    if args.remote or args.docker:
+        asyncio.run(run_remote(args))
+    else:
+        run_local(args)
 
 
 if __name__ == "__main__":

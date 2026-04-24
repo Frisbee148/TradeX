@@ -1,0 +1,235 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776931351760,
+  "projectRoot": "/home/casp1an/Code/TradeX",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1776931351757,
+      "keyFiles": [
+        "app.cpython-314.pyc",
+        "client.cpython-314.pyc",
+        "inference.cpython-314.pyc"
+      ]
+    },
+    "context": {
+      "path": "context",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1776931351759,
+      "keyFiles": [
+        "RLiquidity_V3_Project.md",
+        "Requirements.txt",
+        "checklist.txt",
+        "evaluation.txt",
+        "inference.py"
+      ]
+    },
+    "meverse": {
+      "path": "meverse",
+      "purpose": null,
+      "fileCount": 8,
+      "lastAccessed": 1776931351759,
+      "keyFiles": [
+        "Dockerfile",
+        "__init__.py",
+        "client.py",
+        "models.py",
+        "openenv.yaml"
+      ]
+    },
+    "venv": {
+      "path": "venv",
+      "purpose": null,
+      "fileCount": 3,
+      "lastAccessed": 1776931351759,
+      "keyFiles": [
+        "pyvenv.cfg"
+      ]
+    },
+    "venv/bin": {
+      "path": "venv/bin",
+      "purpose": "Executable scripts",
+      "fileCount": 45,
+      "lastAccessed": 1776931351760,
+      "keyFiles": [
+        "Activate.ps1",
+        "activate",
+        "activate.csh"
+      ]
+    },
+    "venv/lib": {
+      "path": "venv/lib",
+      "purpose": "Library code",
+      "fileCount": 0,
+      "lastAccessed": 1776931351760,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "meverse/server/meverse_environment.py",
+      "accessCount": 11,
+      "lastAccessed": 1776931759419,
+      "type": "file"
+    },
+    {
+      "path": "meverse/__init__.py",
+      "accessCount": 4,
+      "lastAccessed": 1776931766993,
+      "type": "file"
+    },
+    {
+      "path": "meverse/models.py",
+      "accessCount": 3,
+      "lastAccessed": 1776931439828,
+      "type": "file"
+    },
+    {
+      "path": "meverse/client.py",
+      "accessCount": 3,
+      "lastAccessed": 1776931444853,
+      "type": "file"
+    },
+    {
+      "path": "meverse/server/app.py",
+      "accessCount": 3,
+      "lastAccessed": 1776931449170,
+      "type": "file"
+    },
+    {
+      "path": "meverse/openenv.yaml",
+      "accessCount": 2,
+      "lastAccessed": 1775123057853,
+      "type": "file"
+    },
+    {
+      "path": "meverse/Dockerfile",
+      "accessCount": 2,
+      "lastAccessed": 1775123083401,
+      "type": "file"
+    },
+    {
+      "path": "meverse/server/__init__.py",
+      "accessCount": 2,
+      "lastAccessed": 1775123358075,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 2,
+      "lastAccessed": 1776931445189,
+      "type": "file"
+    },
+    {
+      "path": "context/checklist.txt",
+      "accessCount": 1,
+      "lastAccessed": 1775122369363,
+      "type": "file"
+    },
+    {
+      "path": "context/evaluation.txt",
+      "accessCount": 1,
+      "lastAccessed": 1775122369501,
+      "type": "file"
+    },
+    {
+      "path": "context/RLiquidity_V3_Project.md",
+      "accessCount": 1,
+      "lastAccessed": 1775122369529,
+      "type": "file"
+    },
+    {
+      "path": "context/Requirements.txt",
+      "accessCount": 1,
+      "lastAccessed": 1775122369769,
+      "type": "file"
+    },
+    {
+      "path": "context/inference.py",
+      "accessCount": 1,
+      "lastAccessed": 1775122370233,
+      "type": "file"
+    },
+    {
+      "path": "context/validation.py",
+      "accessCount": 1,
+      "lastAccessed": 1775122370479,
+      "type": "file"
+    },
+    {
+      "path": "meverse/server/Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1775122567569,
+      "type": "file"
+    },
+    {
+      "path": "meverse/server/requirements.txt",
+      "accessCount": 1,
+      "lastAccessed": 1775122569121,
+      "type": "file"
+    },
+    {
+      "path": "meverse/validation.py",
+      "accessCount": 1,
+      "lastAccessed": 1776931444086,
+      "type": "file"
+    },
+    {
+      "path": "inference.py",
+      "accessCount": 1,
+      "lastAccessed": 1776931449633,
+      "type": "file"
+    },
+    {
+      "path": "app.py",
+      "accessCount": 1,
+      "lastAccessed": 1776931450146,
+      "type": "file"
+    },
+    {
+      "path": "meverse/env_controller.py",
+      "accessCount": 1,
+      "lastAccessed": 1776931639457,
+      "type": "file"
+    },
+    {
+      "path": "run_self_improving.py",
+      "accessCount": 1,
+      "lastAccessed": 1776931791903,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

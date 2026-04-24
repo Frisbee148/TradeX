@@ -7,9 +7,12 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends git && \
     rm -rf /var/lib/apt/lists/*
 
+ARG BUILD_MODE=in-repo
+ARG ENV_NAME=meverse
+
 COPY . /app/env
 
-WORKDIR /app/env/meverse
+WORKDIR /app/env
 
 RUN if ! command -v uv >/dev/null 2>&1; then \
         curl -LsSf https://astral.sh/uv/install.sh | sh && \
@@ -31,23 +34,21 @@ RUN --mount=type=cache,target=/root/.cache/uv \
         uv sync --no-editable; \
     fi
 
-# Install root-level dependencies (gradio, plotly, numpy) needed by dashboard/app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    VIRTUAL_ENV=/app/env/meverse/.venv \
-    uv pip install --python /app/env/meverse/.venv/bin/python -r /app/env/requirements.txt
-
+# Final runtime stage
 FROM ${BASE_IMAGE}
 
 WORKDIR /app
 
-COPY --from=builder /app/env/meverse/.venv /app/.venv
+COPY --from=builder /app/env/.venv /app/.venv
 COPY --from=builder /app/env /app/env
-# OpenEnv web interface looks for /app/README.md for the Playground readme dropdown
-COPY --from=builder /app/env/README.md /app/README.md
 
 ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONPATH="/app/env:/app/env/meverse:$PYTHONPATH"
+ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
+# HF Spaces uses port 7860 by default
 EXPOSE 7860
 
-CMD ["sh", "-c", "cd /app/env && python app.py"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:7860/health || exit 1
+
+CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 7860"]

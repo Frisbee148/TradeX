@@ -1,0 +1,121 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1776932086223,
+  "projectRoot": "/home/casp1an/Code/TradeX/meverse",
+  "techStack": {
+    "languages": [
+      {
+        "name": "Python",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "pyproject.toml"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "pytest",
+        "version": null,
+        "category": "testing"
+      }
+    ],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": "pytest",
+    "lintCommand": "ruff check",
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "__pycache__": {
+      "path": "__pycache__",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1776932086220,
+      "keyFiles": [
+        "__init__.cpython-314.pyc",
+        "baseline_runner.cpython-314.pyc",
+        "client.cpython-314.pyc",
+        "env_controller.cpython-314.pyc",
+        "inference.cpython-314.pyc"
+      ]
+    },
+    "server": {
+      "path": "server",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1776932086220,
+      "keyFiles": [
+        "__init__.py",
+        "app.py",
+        "meverse_environment.py",
+        "requirements.txt"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "client.py",
+      "accessCount": 1,
+      "lastAccessed": 1776932628344,
+      "type": "file"
+    },
+    {
+      "path": "models.py",
+      "accessCount": 1,
+      "lastAccessed": 1776932628755,
+      "type": "file"
+    },
+    {
+      "path": "server/app.py",
+      "accessCount": 1,
+      "lastAccessed": 1776932629865,
+      "type": "file"
+    },
+    {
+      "path": "server/meverse_environment.py",
+      "accessCount": 1,
+      "lastAccessed": 1776932630320,
+      "type": "file"
+    },
+    {
+      "path": "Dockerfile",
+      "accessCount": 1,
+      "lastAccessed": 1776932630476,
+      "type": "file"
+    },
+    {
+      "path": "openenv.yaml",
+      "accessCount": 1,
+      "lastAccessed": 1776932640307,
+      "type": "file"
+    },
+    {
+      "path": "pyproject.toml",
+      "accessCount": 1,
+      "lastAccessed": 1776932640841,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "openenv-meverse"
 version = "0.1.0"
-description = "Bot-aware AMM market surveillance environment for OpenEnv"
+description = "Meverse environment for OpenEnv"
 requires-python = ">=3.10"
 dependencies = [
     # Core OpenEnv runtime (provides FastAPI server + HTTP client types)

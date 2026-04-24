@@ -1,5 +1,5 @@
 spec_version: 1
-name: amm-market-surveillance
+name: meverse
 type: space
 runtime: fastapi
 app: server.app:app
@@ -7,25 +7,22 @@ port: 7860
 HF: true
 
 metadata:
-  title: "Bot-aware Market Surveillance in Simulated AMM Trading"
-  description: "An OpenEnv reinforcement learning benchmark where agents monitor AMM-style market activity and choose ALLOW, FLAG, BLOCK, or MONITOR responses to suspicious bot-like behavior."
+  title: "MEVerse - MEV-Aware RL Environment"
+  description: "A mini RL environment where agents learn to trade, provide liquidity, and survive adversarial MEV attacks in a simulated Uniswap V3 pool."
   tags:
     - openenv
-    - reinforcement-learning
-    - market-surveillance
-    - anomaly-detection
-    - adversarial-monitoring
+    - rl
+    - defi
+    - mev
+    - uniswap-v3
 
 tasks:
-  - name: burst_detection
-    description: "Task 1 - Burst Detection. Catch abrupt high-frequency suspicious bursts while minimizing harm to normal traffic."
+  - name: easy
+    description: "Clean pool, no adversary. Learn tick-aware swapping and LP fee accrual."
     difficulty: easy
-    grader: programmatic
-  - name: pattern_manipulation_detection
-    description: "Task 2 - Pattern-based Manipulation Detection. Detect repeated timing and size signatures that imply coordinated manipulation."
+  - name: medium
+    description: "JIT bots active. Detect and counter JIT liquidity attacks."
     difficulty: medium
-    grader: programmatic
-  - name: full_market_surveillance
-    description: "Task 3 - Full Market Surveillance. Balance burst, pattern, and false-positive control across mixed activity."
+  - name: hard
+    description: "Adaptive adversary + high volatility. Survive MEV attacks while managing LP positions."
     difficulty: hard
-    grader: programmatic
