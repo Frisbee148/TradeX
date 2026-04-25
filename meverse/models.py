@@ -1,94 +1,65 @@
-"""
-Data models for the MEVerse (RLiquidity V3) Environment.
+"""Typed models for the bot-aware AMM market surveillance benchmark."""
 
-MEV-Aware Reinforcement Learning environment for Uniswap V3 pool simulation.
-Agents learn to trade, provide liquidity, and survive adversarial MEV attacks.
-"""
+from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+import json
+from typing import Any, List, Literal
 
 from openenv.core.env_server.types import Action, Observation
-from pydantic import Field
+from pydantic import Field, model_validator
+
+SurveillanceActionType = Literal["ALLOW", "FLAG", "BLOCK", "MONITOR"]
 
 
-# ──────────────────────────────────────────────
-#  Action Models
-# ──────────────────────────────────────────────
+class SurveillanceAction(Action):
+    """Market surveillance response selected by the agent."""
 
-ActionType = Literal[
-    "swap_exact_in",
-    "split_swap",
-    "add_liquidity",
-    "remove_liquidity",
-    "range_order",
-    "jit_liquidity",
-    "hold",
-    "close_episode",
-]
-
-
-class MeverseAction(Action):
-    """Action for the MEVerse environment."""
-
-    action_type: ActionType = Field(..., description="One of the 8 strategic action types")
-    params: Dict[str, Any] = Field(
-        default_factory=dict,
-        description="Action-specific parameters (amount_in, zero_for_one, use_private_rpc, etc.)",
+    action_type: SurveillanceActionType = Field(
+        ...,
+        description="Final surveillance response to the current market activity.",
     )
 
-
-# ──────────────────────────────────────────────
-#  Observation Sub-Models
-# ──────────────────────────────────────────────
-
-class TickInfo(Dict[str, Any]):
-    """Tick distribution entry — used as plain dict in observation."""
-    pass
-
-
-class MempoolTx(Dict[str, Any]):
-    """Mempool transaction entry — used as plain dict in observation."""
-    pass
-
-
-class LPPositionInfo(Dict[str, Any]):
-    """LP position entry — used as plain dict in observation."""
-    pass
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_action(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "action_type" in data:
+            value = data["action_type"]
+            if isinstance(value, str):
+                data["action_type"] = value.strip().upper()
+            params = data.get("params")
+            if isinstance(params, str):
+                try:
+                    parsed = json.loads(params)
+                    if isinstance(parsed, dict) and "action_type" in parsed:
+                        data["action_type"] = str(parsed["action_type"]).strip().upper()
+                except json.JSONDecodeError:
+                    pass
+        return data
 
 
-class MeverseObservation(Observation):
-    """Observation from the MEVerse environment — full V3 pool state."""
+class SurveillanceObservation(Observation):
+    """Fixed-size surveillance features for a recent AMM trading window."""
 
-    # Pool state
-    current_tick: int = Field(default=0, description="Active tick index")
-    current_price: float = Field(default=0.0, description="Token1/Token0 price (e.g. USDC per ETH)")
-    sqrt_price: float = Field(default=0.0, description="Square root of price, used in V3 math")
-    active_liquidity: float = Field(default=0.0, description="Total liquidity at current tick")
+    current_amm_price: float = Field(default=0.0)
+    liquidity_snapshot: float = Field(default=0.0)
+    recent_trade_count: int = Field(default=0)
+    trades_in_window: List[float] = Field(default_factory=list)
+    trade_frequency: float = Field(default=0.0)
+    average_trade_size: float = Field(default=0.0)
+    maximum_trade_size: float = Field(default=0.0)
+    recent_slippage_impact: float = Field(default=0.0)
+    time_gap_mean: float = Field(default=0.0)
+    time_gap_min: float = Field(default=0.0)
+    recent_time_gaps: List[float] = Field(default_factory=list)
+    recent_price_impacts: List[float] = Field(default_factory=list)
+    burst_indicator: float = Field(default=0.0)
+    pattern_indicator: float = Field(default=0.0)
+    suspiciousness_score: float = Field(default=0.0)
+    manipulation_score: float = Field(default=0.0)
+    step_num: int = Field(default=0)
+    max_steps: int = Field(default=0)
+    task_name: str = Field(default="burst_detection")
 
-    # Tick distribution (±5 ticks window)
-    tick_distribution: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="11 entries: tick, price, net_liquidity, jit_liquidity",
-    )
 
-    # Agent portfolio
-    agent_token0: float = Field(default=0.0, description="ETH balance")
-    agent_token1: float = Field(default=0.0, description="USDC balance")
-    agent_positions: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="Agent LP positions with tick_lower, tick_upper, liquidity, fees_earned",
-    )
-
-    # Mempool
-    mempool: List[Dict[str, Any]] = Field(
-        default_factory=list,
-        description="Pending transactions visible in mempool",
-    )
-
-    # Step info
-    last_mev_loss: float = Field(default=0.0, description="MEV extracted in previous step")
-    step_num: int = Field(default=0, description="Current step number")
-    max_steps: int = Field(default=30, description="Maximum steps in this episode")
-
-    # Task info
-    task_name: str = Field(default="easy", description="Current task: easy/medium/hard")
+MeverseAction = SurveillanceAction
+MeverseObservation = SurveillanceObservation
